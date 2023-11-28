@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PongJS</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        overflow: hidden;
+      }
+
+      #canvas {
+      }
+
+      h1 {
+        color: white;
+        font-family: sans-serif;
+        font-size: 4rem;
+        position: absolute;
+        bottom: 100px;
+      }
+
+      #igrac1Rez {
+        left: 35%;
+      }
+
+      #igrac2Rez {
+        right: 35%;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <h1 id="igrac1Rez">0</h1>
+    <h1 id="igrac2Rez">0</h1>
+
+    <script>
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      // user inputi
+      const keysPressed = [];
+      // ID gornje i donje strelice na tastaturi
+      const KEY_UP = 38;
+      const KEY_DOWN = 40;
+
+      window.addEventListener("keydown", function (e) {
+        keysPressed[e.keyCode] = true;
+      });
+
+      window.addEventListener("keyup", function (e) {
+        keysPressed[e.keyCode] = false;
+      });
+
+      function vec2(x, y) {
+        return { x: x, y: y };
+      }
+
+      function Lopta(pos, velocity, radius) {
+        this.pos = pos;
+        this.velocity = velocity;
+        this.radius = radius;
+
+        this.update = function () {
+          this.pos.x += this.velocity.x;
+          this.pos.y += this.velocity.y;
+        };
+
+        this.draw = function () {
+          ctx.fillStyle = "#33ff00";
+          ctx.strokeStyle = "#33ff00";
+          ctx.beginPath();
+          ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        };
+      }
+
+      function Reket(pos, velocity, width, height) {
+        this.pos = pos;
+        this.velocity = velocity;
+        this.width = width;
+        this.height = height;
+        this.score = 0;
+
+        this.update = function () {
+          if (keysPressed[KEY_UP]) {
+            this.pos.y -= this.velocity.y;
+          }
+
+          if (keysPressed[KEY_DOWN]) {
+            this.pos.y += this.velocity.y;
+          }
+        };
+        this.draw = function () {
+          ctx.fillStyle = "#33ff00";
+          ctx.fillRect(this.pos.x, this.pos.y, this.width, this.height);
+        };
+
+        this.getHalfWidth = function () {
+          return this.width / 2;
+        };
+
+        this.getHalfHeight = function () {
+          return this.height / 2;
+        };
+
+        this.getCenter = function () {
+          return vec2(
+            this.pos.x + this.getHalfWidth(),
+            this.pos.y + this.getHalfHeight()
+          );
+        };
+      }
+
+      // da reket ne ode van ekrana
+      function sudaranjeReketaPoIvicama(reket) {
+        if (reket.pos.y <= 0) {
+          reket.pos.y = 0;
+        }
+
+        if (reket.pos.y + reket.height >= canvas.height) {
+          reket.pos.y = canvas.height - reket.height;
+        }
+      }
+
+      // da loptica ne ode van ekrana
+      function sudaranjeLoptePoIvicama(lopta) {
+        if (lopta.pos.y + lopta.radius >= canvas.height) {
+          lopta.velocity.y *= -1;
+        }
+
+        if (lopta.pos.y - lopta.radius <= 0) {
+          lopta.velocity.y *= -1;
+        }
+
+        // if (lopta.pos.x + lopta.radius >= canvas.width) {
+        //   lopta.velocity.x *= -1;
+        // }
+
+        // if (lopta.pos.x - lopta.radius <= 0) {
+        //   lopta.velocity.x *= -1;
+        // }
+      }
+
+      function sudaranjeLopteSaReketom(lopta, reket) {
+        let dx = Math.abs(lopta.pos.x - reket.getCenter().x);
+        let dy = Math.abs(lopta.pos.y - reket.getCenter().y);
+
+        if (
+          dx <= lopta.radius + reket.getHalfWidth() &&
+          dy <= reket.getHalfHeight() + lopta.radius
+        ) {
+          lopta.velocity.x *= -1;
+        }
+      }
+
+      // najgori AI ikada
+      function igrac2AI(lopta, reket) {
+        if (lopta.velocity.x > 0) {
+          if (lopta.pos.y > reket.pos.y) {
+            reket.pos.y += reket.velocity.y;
+
+            if (reket.pos.y + reket.height >= canvas.height) {
+              reket.pos.y = canvas.height - reket.height;
+            }
+          }
+          if (lopta.pos.y < reket.pos.y) {
+            reket.pos.y -= reket.velocity.y;
+
+            if (reket.pos.y <= 0) {
+              reket.pos.y = 0;
+            }
+          }
+        }
+      }
+
+      function ponovoPrikaziLoptu(lopta) {
+        if (lopta.velocity.x > 0) {
+          lopta.pos.x = canvas.width - 150;
+          lopta.pos.y = Math.random() * (canvas.height - 200) + 100;
+        }
+
+        if (lopta.velocity.x < 0) {
+          lopta.pos.x = 150;
+          lopta.pos.y = Math.random() * (canvas.height - 200) + 100;
+        }
+
+        lopta.velocity.x *= -1;
+        lopta.velocity.y *= -1;
+      }
+
+      function povecajRezultat(lopta, reket1, reket2) {
+        if (lopta.pos.x <= -lopta.radius) {
+          reket2.score += 1;
+          document.getElementById("igrac2Rez").innerHTML = reket2.score;
+          ponovoPrikaziLoptu(lopta);
+        }
+
+        if (lopta.pos.x >= canvas.width + lopta.radius) {
+          reket1.score += 1;
+          document.getElementById("igrac1Rez").innerHTML = reket1.score;
+          ponovoPrikaziLoptu(lopta);
+        }
+      }
+
+      function iscrtajLinije() {
+        ctx.strokeStyle = "#ffff00";
+
+        ctx.beginPath();
+        ctx.lineWidth = 20;
+        ctx.moveTo(0, 0);
+        ctx.lineTo(canvas.width, 0);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.lineWidth = 20;
+        ctx.moveTo(0, canvas.height);
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.lineWidth = 15;
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, canvas.height);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.lineWidth = 15;
+        ctx.moveTo(canvas.width, 0);
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.lineWidth = 10;
+        ctx.moveTo(canvas.width / 2, 0);
+        ctx.lineTo(canvas.width / 2, canvas.height);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, 50, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const lopta = new Lopta(vec2(200, 200), vec2(10, 10), 20);
+      const reket1 = new Reket(vec2(0, 50), vec2(15, 15), 20, 160);
+      const reket2 = new Reket(
+        vec2(canvas.width - 20, 30),
+        vec2(15, 15),
+        20,
+        160
+      );
+
+      function gameUpdate() {
+        lopta.update();
+        reket1.update();
+        sudaranjeReketaPoIvicama(reket1);
+        sudaranjeLoptePoIvicama(lopta);
+
+        igrac2AI(lopta, reket2);
+
+        sudaranjeLopteSaReketom(lopta, reket1);
+        sudaranjeLopteSaReketom(lopta, reket2);
+
+        povecajRezultat(lopta, reket1, reket2);
+      }
+
+      function gameDraw() {
+        lopta.draw();
+        reket1.draw();
+        reket2.draw();
+        iscrtajLinije();
+      }
+
+      function gameLoop() {
+        // ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // trail efekat
+        ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // 60 fps
+        window.requestAnimationFrame(gameLoop);
+
+        gameUpdate();
+        gameDraw();
+      }
+
+      gameLoop();
+    </script>
+  </body>
+</html>
